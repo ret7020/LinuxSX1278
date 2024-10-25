@@ -23,51 +23,6 @@ void delay_ns(long nanoseconds)
 	nanosleep(&req, NULL);
 }
 
-int gpio_export(int pin)
-{
-	char path[35];
-	int fd = open("/sys/class/gpio/export", O_WRONLY);
-	if (fd == -1)
-	{
-		perror("Unable to open /sys/class/gpio/export");
-		return -1;
-	}
-	snprintf(path, sizeof(path), "%d", pin);
-	write(fd, path, strlen(path));
-	close(fd);
-	return 0;
-}
-
-int gpio_set_direction(int pin, const char *direction)
-{
-	char path[35];
-	snprintf(path, sizeof(path), "/sys/class/gpio/gpio%d/direction", pin);
-	int fd = open(path, O_WRONLY);
-	if (fd == -1)
-	{
-		perror("Unable to open GPIO direction");
-		return -1;
-	}
-	write(fd, direction, strlen(direction));
-	close(fd);
-	return 0;
-}
-
-int gpio_write(int pin, int value)
-{
-	char path[30];
-	snprintf(path, sizeof(path), "/sys/class/gpio/gpio%d/value", pin);
-	int fd = open(path, O_WRONLY);
-	if (fd == -1)
-	{
-		perror("Unable to open GPIO value");
-		return -1;
-	}
-	char finalVal = '0' + value;
-	write(fd, &finalVal, 1);
-	close(fd);
-	return 0;
-}
 
 int spi_init(int *spi_fd)
 {

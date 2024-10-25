@@ -12,6 +12,10 @@ int main(){
         return -1;
     }
 
+    lora.end();
+
+
+
     
 
     return 0;

@@ -18,9 +18,15 @@ class LoRa
 private:
     const char* spiDev;
     uint8_t csPin;
+    int spi_fd;
+    int spiInit();
 public:
     LoRa(const char* spiDevice, uint8_t csPin);
     int begin(long frequency);
+    int end();
+
+    int readRegister(uint8_t reg);
+
 };
 
 #endif

@@ -100,7 +100,7 @@ int LoRa::begin(long frequency)
     // put in standby mode
     idle();
     usleep(10000);
-    setPin(csPin, 1);
+    // setPin(csPin, 1);
 
     return 0;
 }
@@ -174,6 +174,111 @@ void LoRa::setTxPower(int level, int outputPin)
 
         writeRegister(REG_PA_CONFIG, PA_BOOST | (level - 2));
     }
+}
+
+bool LoRa::isTransmitting()
+{
+    if ((readRegister(REG_OP_MODE) & MODE_TX) == MODE_TX)
+    {
+        return true;
+    }
+
+    if (readRegister(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK)
+    {
+        // clear IRQ's
+        writeRegister(REG_IRQ_FLAGS, IRQ_TX_DONE_MASK);
+    }
+
+    return false;
+}
+
+int LoRa::beginPacket(int implicitHeader)
+{
+    if (isTransmitting())
+    {
+        return 0;
+    }
+
+    // put in standby mode
+    idle();
+
+    if (implicitHeader)
+    {
+        implicitHeaderMode();
+    }
+    else
+    {
+        explicitHeaderMode();
+    }
+
+    // reset FIFO address and paload length
+    writeRegister(REG_FIFO_ADDR_PTR, 0);
+    writeRegister(REG_PAYLOAD_LENGTH, 0);
+
+    return 1;
+}
+
+size_t LoRa::write(uint8_t byte)
+{
+    return write(&byte, sizeof(byte));
+}
+
+size_t LoRa::write(const uint8_t *buffer, size_t size)
+{
+    int currentLength = readRegister(REG_PAYLOAD_LENGTH);
+
+    // check size
+    if ((currentLength + size) > MAX_PKT_LENGTH)
+    {
+        size = MAX_PKT_LENGTH - currentLength;
+    }
+
+    // write data
+    for (size_t i = 0; i < size; i++)
+    {
+        writeRegister(REG_FIFO, buffer[i]);
+    }
+
+    // update length
+    writeRegister(REG_PAYLOAD_LENGTH, currentLength + size);
+
+    return size;
+}
+
+int LoRa::endPacket(bool async)
+{
+
+    if ((async) && (_onTxDone))
+        writeRegister(REG_DIO_MAPPING_1, 0x40); // DIO0 => TXDONE
+
+    // put in TX mode
+    writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX);
+
+    if (!async)
+    {
+        // wait for TX done
+        while ((readRegister(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0)
+        {
+        }
+        // clear IRQ's
+        writeRegister(REG_IRQ_FLAGS, IRQ_TX_DONE_MASK);
+    }
+
+    return 1;
+}
+
+void LoRa::implicitHeaderMode()
+{
+    _implicitHeaderMode = 1;
+
+    writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) | 0x01);
+}
+
+void LoRa::explicitHeaderMode()
+{
+    _implicitHeaderMode = 0;
+
+    writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) & 0xfe);
 }
 
 int LoRa::end()

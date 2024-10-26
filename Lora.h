@@ -89,6 +89,9 @@ private:
     uint8_t csPin;
     int spi_fd;
     long _frequency;
+    int _implicitHeaderMode;
+    void (*_onTxDone)();
+
 
     int spiInit();
     int spiSend(uint8_t *tx, uint8_t *rx);
@@ -105,6 +108,15 @@ public:
     void setOCP(uint8_t mA);
     void setFrequency(long frequency);
     void setTxPower(int level, int outputPin=PA_OUTPUT_PA_BOOST_PIN);
+    bool isTransmitting();
+    int beginPacket(int implicitHeader=false);
+    int endPacket(bool async=false);
+    size_t write(uint8_t byte);
+    size_t write(const uint8_t *buffer, size_t size);
+
+
+    void implicitHeaderMode();
+    void explicitHeaderMode();
 
 };
 

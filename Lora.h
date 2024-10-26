@@ -111,6 +111,12 @@ public:
     bool isTransmitting();
     int beginPacket(int implicitHeader=false);
     int endPacket(bool async=false);
+
+    void setSignalBandwidth(long sbw);
+    long getSignalBandwidth();
+    int getSpreadingFactor();
+    void setSpreadingFactor(int sf);
+    void setLdoFlag();
     size_t write(uint8_t byte);
     size_t write(const uint8_t *buffer, size_t size);
 

@@ -1,6 +1,14 @@
 #include "Lora.h"
 #include "gpio.h"
 
+void bitWrite(uint8_t *x, char n, char value)
+{
+    if (value)
+        *x |= (1 << n);
+    else
+        *x &= ~(1 << n);
+}
+
 #define DEBUG
 
 LoRa::LoRa(const char *spiDevice, uint8_t chipSelectPin)
@@ -273,6 +281,110 @@ int LoRa::endPacket(bool async)
     }
 
     return 1;
+}
+
+void LoRa::setSpreadingFactor(int sf)
+{
+    if (sf < 6)
+    {
+        sf = 6;
+    }
+    else if (sf > 12)
+    {
+        sf = 12;
+    }
+
+    if (sf == 6)
+    {
+        writeRegister(REG_DETECTION_OPTIMIZE, 0xc5);
+        writeRegister(REG_DETECTION_THRESHOLD, 0x0c);
+    }
+    else
+    {
+        writeRegister(REG_DETECTION_OPTIMIZE, 0xc3);
+        writeRegister(REG_DETECTION_THRESHOLD, 0x0a);
+    }
+
+    writeRegister(REG_MODEM_CONFIG_2, (readRegister(REG_MODEM_CONFIG_2) & 0x0f) | ((sf << 4) & 0xf0));
+    setLdoFlag();
+}
+
+int LoRa::getSpreadingFactor()
+{
+    return readRegister(REG_MODEM_CONFIG_2) >> 4;
+}
+
+void LoRa::setSignalBandwidth(long sbw)
+{
+    int bw;
+
+    if (sbw <= 7.8E3)
+        bw = 0;
+    else if (sbw <= 10.4E3)
+        bw = 1;
+    else if (sbw <= 15.6E3)
+        bw = 2;
+    else if (sbw <= 20.8E3)
+        bw = 3;
+    else if (sbw <= 31.25E3)
+        bw = 4;
+    else if (sbw <= 41.7E3)
+        bw = 5;
+    else if (sbw <= 62.5E3)
+        bw = 6;
+    else if (sbw <= 125E3)
+        bw = 7;
+    else if (sbw <= 250E3)
+        bw = 8;
+    else
+        bw = 9;
+
+    writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0x0f) | (bw << 4));
+    setLdoFlag();
+}
+
+long LoRa::getSignalBandwidth()
+{
+    uint8_t bw = (readRegister(REG_MODEM_CONFIG_1) >> 4);
+
+    switch (bw)
+    {
+    case 0:
+        return 7.8E3;
+    case 1:
+        return 10.4E3;
+    case 2:
+        return 15.6E3;
+    case 3:
+        return 20.8E3;
+    case 4:
+        return 31.25E3;
+    case 5:
+        return 41.7E3;
+    case 6:
+        return 62.5E3;
+    case 7:
+        return 125E3;
+    case 8:
+        return 250E3;
+    case 9:
+        return 500E3;
+    }
+
+    return -1;
+}
+
+void LoRa::setLdoFlag()
+{
+    // Section 4.1.1.5
+    long symbolDuration = 1000 / (getSignalBandwidth() / (1L << getSpreadingFactor()));
+
+    // Section 4.1.1.6
+    bool ldoOn = symbolDuration > 16;
+
+    uint8_t config3 = readRegister(REG_MODEM_CONFIG_3);
+    bitWrite(&config3, 3, ldoOn);
+    writeRegister(REG_MODEM_CONFIG_3, config3);
 }
 
 void LoRa::implicitHeaderMode()

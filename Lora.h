@@ -94,7 +94,7 @@ private:
 
 
     int spiInit();
-    int spiSend(uint8_t *tx, uint8_t *rx);
+    int spiSend(uint8_t *tx, uint8_t *rx, uint8_t len);
 public:
     LoRa(const char* spiDevice, uint8_t csPin);
     int begin(long frequency);

@@ -28,18 +28,20 @@ int LoRa::spiInit()
     return 0;
 }
 
-int LoRa::spiSend(uint8_t *tx, uint8_t *rx)
+int LoRa::spiSend(uint8_t *tx, uint8_t *rx, uint8_t len)
 {
+    setPin(csPin, 0);
     struct spi_ioc_transfer tr = {
         .tx_buf = (unsigned long)tx,
         .rx_buf = (unsigned long)rx,
-        .len = sizeof(tx) / sizeof(tx[0]),
+        .len = len,
         .speed_hz = SPI_FREQ,
         .bits_per_word = 8,
     };
 
     if (ioctl(spi_fd, SPI_IOC_MESSAGE(1), &tr) < 0)
         return -1;
+    setPin(csPin, 1);
     return 0;
 }
 
@@ -49,7 +51,7 @@ int LoRa::readRegister(uint8_t address)
     uint8_t regNew = address & 0x7F;
     uint8_t tx[2] = {regNew, 0x00};
     uint8_t rx[2] = {0, 0};
-    spiSend(tx, rx);
+    spiSend(tx, rx, 2);
     return rx[1];
 }
 
@@ -58,7 +60,7 @@ void LoRa::writeRegister(uint8_t address, uint8_t value)
     uint8_t regNew = address | 0x80;
     uint8_t tx[2] = {regNew, value};
     uint8_t rx[2] = {0, 0};
-    spiSend(tx, rx);
+    spiSend(tx, rx, 2);
 }
 
 void LoRa::sleep() { writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP); }
@@ -69,10 +71,17 @@ void LoRa::idle() { writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY
 int LoRa::begin(long frequency)
 {
 
-    // TODO impplement reset via RST pin
     spiInit();
-    setPin(csPin, 0);
+    setPin(csPin, 1);
+
+    // Reset
+
+    // perform reset
+    printf("setPin status: %d\n", setPin(56, 1));
     usleep(10000);
+    setPin(56, 1);
+    usleep(10000);
+
     uint8_t version = readRegister(0x42);
 
 #ifdef DEBUG
@@ -247,7 +256,6 @@ size_t LoRa::write(const uint8_t *buffer, size_t size)
 
 int LoRa::endPacket(bool async)
 {
-
     if ((async) && (_onTxDone))
         writeRegister(REG_DIO_MAPPING_1, 0x40); // DIO0 => TXDONE
 

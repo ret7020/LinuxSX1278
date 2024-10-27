@@ -401,6 +401,70 @@ void LoRa::explicitHeaderMode()
     writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) & 0xfe);
 }
 
+int LoRa::parsePacket(int size)
+{
+    int packetLength = 0;
+    int irqFlags = readRegister(REG_IRQ_FLAGS);
+
+    if (size > 0)
+    {
+        implicitHeaderMode();
+        writeRegister(REG_PAYLOAD_LENGTH, size & 0xff);
+    }
+    else
+        explicitHeaderMode();
+
+    writeRegister(REG_IRQ_FLAGS, irqFlags);
+
+    if ((irqFlags & IRQ_RX_DONE_MASK) && (irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0)
+    {
+        _packetIndex = 0;
+
+        if (_implicitHeaderMode)
+            packetLength = readRegister(REG_PAYLOAD_LENGTH);
+        else
+            packetLength = readRegister(REG_RX_NB_BYTES);
+
+        // set FIFO address to current RX address
+        writeRegister(REG_FIFO_ADDR_PTR, readRegister(REG_FIFO_RX_CURRENT_ADDR));
+
+        // put in standby mode
+        idle();
+    }
+    else if (readRegister(REG_OP_MODE) != (MODE_LONG_RANGE_MODE | MODE_RX_SINGLE))
+    {
+        // not currently in RX mode
+
+        // reset FIFO address
+        writeRegister(REG_FIFO_ADDR_PTR, 0);
+
+        // put in single RX mode
+        writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_SINGLE);
+    }
+
+    return packetLength;
+}
+
+int LoRa::available()
+{
+    return (readRegister(REG_RX_NB_BYTES) - _packetIndex);
+}
+
+int LoRa::read()
+{
+    if (!available())
+        return -1;
+
+    _packetIndex++;
+
+    return readRegister(REG_FIFO);
+}
+
+int LoRa::packetRssi()
+{
+    return (readRegister(REG_PKT_RSSI_VALUE) - (_frequency < RF_MID_BAND_THRESHOLD ? RSSI_OFFSET_LF_PORT : RSSI_OFFSET_HF_PORT));
+}
+
 int LoRa::end()
 {
     sleep();

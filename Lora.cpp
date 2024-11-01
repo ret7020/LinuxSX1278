@@ -14,7 +14,7 @@ void bitWrite(uint8_t *x, char n, char value)
 LoRa::LoRa(const char *spiDevice, uint8_t chipSelectPin)
 {
 #ifdef DEBUG
-    printf("device: %s\n", spiDevice);
+    printf("[SX1278] device: %s\n", spiDevice);
 #endif
     spiDev = spiDevice;
     csPin = chipSelectPin;
@@ -85,7 +85,7 @@ int LoRa::begin(long frequency)
     // Reset
 
     // perform reset
-    printf("setPin status: %d\n", setPin(56, 1));
+    printf("[SX1278] setPin status: %d\n", setPin(56, 1));
     usleep(10000);
     setPin(56, 1);
     usleep(10000);
@@ -93,7 +93,7 @@ int LoRa::begin(long frequency)
     uint8_t version = readRegister(0x42);
 
 #ifdef DEBUG
-    printf("SX1278 Version: 0x%02X\n", version);
+    printf("[SX1278] Version: 0x%02X\n", version);
 #endif
     if (version != 0x12)
         return -1; // SX1278 version mismatch
@@ -119,6 +119,10 @@ int LoRa::begin(long frequency)
     usleep(10000);
     // setPin(csPin, 1);
 
+#ifdef DEBUG
+    printf("[SX1278] Pushed into idle mode\n");
+#endif
+
     return 0;
 }
 
@@ -143,6 +147,9 @@ void LoRa::setFrequency(long frequency)
     writeRegister(REG_FRF_MSB, (uint8_t)(frf >> 16));
     writeRegister(REG_FRF_MID, (uint8_t)(frf >> 8));
     writeRegister(REG_FRF_LSB, (uint8_t)(frf >> 0));
+#ifdef DEBUG
+    printf("[SX1278] Set freq: %ld\n", frequency);
+#endif
 }
 
 void LoRa::setTxPower(int level, int outputPin)
@@ -279,6 +286,9 @@ int LoRa::endPacket(bool async)
         // clear IRQ's
         writeRegister(REG_IRQ_FLAGS, IRQ_TX_DONE_MASK);
     }
+#ifdef DEBUG
+    printf("[SX1278] Sent packet\n");
+#endif
 
     return 1;
 }
@@ -307,6 +317,10 @@ void LoRa::setSpreadingFactor(int sf)
 
     writeRegister(REG_MODEM_CONFIG_2, (readRegister(REG_MODEM_CONFIG_2) & 0x0f) | ((sf << 4) & 0xf0));
     setLdoFlag();
+
+#ifdef DEBUG
+    printf("[SX1278] Set SF=%d\n", sf);
+#endif
 }
 
 int LoRa::getSpreadingFactor()
@@ -341,6 +355,10 @@ void LoRa::setSignalBandwidth(long sbw)
 
     writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0x0f) | (bw << 4));
     setLdoFlag();
+
+#ifdef DEBUG
+    printf("[SX1278] Set BW=%d\n", bw);
+#endif
 }
 
 long LoRa::getSignalBandwidth()
@@ -392,6 +410,10 @@ void LoRa::implicitHeaderMode()
     _implicitHeaderMode = 1;
 
     writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) | 0x01);
+
+#ifdef DEBUG
+    printf("[SX1278] Set ImplicitHeaderMode\n");
+#endif
 }
 
 void LoRa::explicitHeaderMode()
@@ -399,6 +421,10 @@ void LoRa::explicitHeaderMode()
     _implicitHeaderMode = 0;
 
     writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) & 0xfe);
+
+#ifdef DEBUG
+    printf("[SX1278] Set ExplicitHeaderMode\n");
+#endif
 }
 
 int LoRa::parsePacket(int size)
@@ -412,7 +438,9 @@ int LoRa::parsePacket(int size)
         writeRegister(REG_PAYLOAD_LENGTH, size & 0xff);
     }
     else
+    {
         explicitHeaderMode();
+    }
 
     writeRegister(REG_IRQ_FLAGS, irqFlags);
 
@@ -440,6 +468,9 @@ int LoRa::parsePacket(int size)
 
         // put in single RX mode
         writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_SINGLE);
+#ifdef DEBUG
+        printf("[SX1278] Putting into RX mode done \n");
+#endif
     }
 
     return packetLength;
@@ -463,6 +494,11 @@ int LoRa::read()
 int LoRa::packetRssi()
 {
     return (readRegister(REG_PKT_RSSI_VALUE) - (_frequency < RF_MID_BAND_THRESHOLD ? RSSI_OFFSET_LF_PORT : RSSI_OFFSET_HF_PORT));
+}
+
+void LoRa::setSyncWord(int sw)
+{
+    writeRegister(REG_SYNC_WORD, sw);
 }
 
 int LoRa::end()

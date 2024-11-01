@@ -88,7 +88,7 @@ private:
     int spi_fd;
     long _frequency;
 
-    int _implicitHeaderMode;
+    int _implicitHeaderMode = 0;
     int _packetIndex = 0;
     void (*_onTxDone)();
 
@@ -127,6 +127,8 @@ public:
 
     void implicitHeaderMode();
     void explicitHeaderMode();
+
+    void setSyncWord(int sw);
 };
 
 #endif

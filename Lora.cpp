@@ -9,7 +9,7 @@ void bitWrite(uint8_t *x, char n, char value)
         *x &= ~(1 << n);
 }
 
-#define DEBUG
+// #define DEBUG
 
 LoRa::LoRa(const char *spiDevice, uint8_t chipSelectPin)
 {
@@ -100,6 +100,7 @@ int LoRa::begin(long frequency)
 
     sleep();
     setFrequency(frequency);
+    _frequency = frequency;
 
     // set base addresses
     writeRegister(REG_FIFO_TX_BASE_ADDR, 0);

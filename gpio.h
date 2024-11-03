@@ -18,6 +18,18 @@ int exportPin(uint8_t pin)
     return 0;
 }
 
+int unexportPin(uint8_t pin)
+{
+    FILE *exportFile = fopen("/sys/class/gpio/unexport", "w");
+    if (exportFile == NULL)
+        return -1;
+    fprintf(exportFile, "%d", pin);
+    fclose(exportFile);
+
+    return 0;
+}
+
+
 int setDirPin(uint8_t pin, const char *dir)
 {
     char directionPath[50];
@@ -39,12 +51,27 @@ int writePin(uint8_t pin, uint8_t value)
     if (valueFile == NULL)
         return -1;
 
-    // if 
+    // if
     // printf("Setting pin: %d = %d\n", pin, value);
-    if (value) fprintf(valueFile, "1");
-    else fprintf(valueFile, "0");
+    if (value)
+        fprintf(valueFile, "1");
+    else
+        fprintf(valueFile, "0");
     fflush(valueFile);
     fclose(valueFile);
+
+    return 0;
+}
+
+int setInterruptType(uint8_t pin, const char *type)
+{
+    char interruptPath[50];
+    snprintf(interruptPath, sizeof(interruptPath), "/sys/class/gpio/gpio%d/edge", pin);
+    FILE *interruptFile = fopen(interruptPath, "w");
+    if (interruptFile == NULL)
+        return -1;
+    fprintf(interruptFile, type);
+    fclose(interruptFile);
 
     return 0;
 }

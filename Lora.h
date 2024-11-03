@@ -9,6 +9,7 @@
 #include <linux/spi/spidev.h>
 #include <stdlib.h>
 #include <string.h>
+#include <poll.h>
 #include <time.h>
 
 #define SPI_FREQ 500000
@@ -85,18 +86,24 @@ class LoRa
 private:
     const char *spiDev;
     uint8_t csPin;
+    uint8_t rstPin;
+    uint8_t dio0Pin;
     int spi_fd;
+    int dio0_fd;
+    struct pollfd dio0_pfd;
     long _frequency;
 
     int _implicitHeaderMode = 0;
+
     int _packetIndex = 0;
     void (*_onTxDone)();
+    void (*_onReceive)(int);
 
     int spiInit();
     int spiSend(uint8_t *tx, uint8_t *rx, uint8_t len);
 
 public:
-    LoRa(const char *spiDevice, uint8_t csPin);
+    LoRa(const char *spiDevice, uint8_t csPin, uint8_t rstPin, uint8_t _dio0Pin);
     int begin(long frequency);
     int end();
 
@@ -124,6 +131,9 @@ public:
     int available();
     int read();
     int packetRssi();
+    void onReceive(void (*callback)(int));
+    void receive(int size = 0);
+    void rxTick();
 
     void implicitHeaderMode();
     void explicitHeaderMode();

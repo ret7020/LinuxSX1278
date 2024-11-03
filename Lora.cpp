@@ -11,13 +11,15 @@ void bitWrite(uint8_t *x, char n, char value)
 
 // #define DEBUG
 
-LoRa::LoRa(const char *spiDevice, uint8_t chipSelectPin)
+LoRa::LoRa(const char *spiDevice, uint8_t chipSelectPin, uint8_t resetPin, uint8_t _dio0Pin)
 {
 #ifdef DEBUG
     printf("[SX1278] device: %s\n", spiDevice);
 #endif
     spiDev = spiDevice;
     csPin = chipSelectPin;
+    rstPin = resetPin;
+    dio0Pin = _dio0Pin;
 }
 
 // SPI functions
@@ -490,6 +492,103 @@ int LoRa::read()
     _packetIndex++;
 
     return readRegister(REG_FIFO);
+}
+
+void LoRa::onReceive(void (*callback)(int))
+{
+    // TODO not ported yet
+    _onReceive = callback;
+
+    if (callback)
+    {
+        exportPin(dio0Pin);
+        setDirPin(dio0Pin, "in");
+        setInterruptType(dio0Pin, "rising");
+
+        char valuePath[50];
+        snprintf(valuePath, sizeof(valuePath), "/sys/class/gpio/gpio%d/value", dio0Pin);
+        dio0_fd = open(valuePath, O_RDONLY | O_NONBLOCK);
+
+        if (dio0_fd < 0)
+            printf("[SX1278] Err: Unable to open GPIO value file\n");
+
+        dio0_pfd.fd = dio0_fd;
+        dio0_pfd.events = POLLPRI;
+
+        // Read first "init interrupt"
+        char buf[3];
+        lseek(dio0_fd, 0, SEEK_SET);
+        ::read(dio0_fd, buf, sizeof(buf)); // poll.h read
+    }
+    else
+    {
+        unexportPin(dio0Pin);
+    }
+}
+
+void LoRa::rxTick()
+{
+    int ret = poll(&dio0_pfd, 1, -1);
+    if (ret > 0)
+    {
+        char buf[3];
+        lseek(dio0_fd, 0, SEEK_SET);
+        ::read(dio0_fd, buf, sizeof(buf)); // poll.h read
+        int irqFlags = readRegister(REG_IRQ_FLAGS);
+
+        // clear IRQ's
+        writeRegister(REG_IRQ_FLAGS, irqFlags);
+
+        if ((irqFlags & IRQ_CAD_DONE_MASK) != 0)
+        {
+            // TODO CAD not imlemented yet
+        }
+        else if ((irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0)
+        {
+
+            if ((irqFlags & IRQ_RX_DONE_MASK) != 0)
+            {
+                // received a packet
+                _packetIndex = 0;
+
+                // read packet length
+                int packetLength = _implicitHeaderMode ? readRegister(REG_PAYLOAD_LENGTH) : readRegister(REG_RX_NB_BYTES);
+
+                // set FIFO address to current RX address
+                writeRegister(REG_FIFO_ADDR_PTR, readRegister(REG_FIFO_RX_CURRENT_ADDR));
+
+                if (_onReceive)
+                {
+                    _onReceive(packetLength);
+                }
+            }
+            // else if ((irqFlags & IRQ_TX_DONE_MASK) != 0) // TODO maybe it works, but not tested yet
+            // {
+            //     if (_onTxDone)
+            //     {
+            //         _onTxDone();
+            //     }
+            // }
+        }
+    }
+}
+
+void LoRa::receive(int size)
+{
+
+    writeRegister(REG_DIO_MAPPING_1, 0x00); // DIO0 => RXDONE
+
+    if (size > 0)
+    {
+        implicitHeaderMode();
+        writeRegister(REG_PAYLOAD_LENGTH, size & 0xff);
+    }
+    else
+    {
+        explicitHeaderMode();
+    }
+
+    writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);
 }
 
 int LoRa::packetRssi()

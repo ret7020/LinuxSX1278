@@ -29,7 +29,6 @@ int unexportPin(uint8_t pin)
     return 0;
 }
 
-
 int setDirPin(uint8_t pin, const char *dir)
 {
     char directionPath[50];
@@ -51,8 +50,6 @@ int writePin(uint8_t pin, uint8_t value)
     if (valueFile == NULL)
         return -1;
 
-    // if
-    // printf("Setting pin: %d = %d\n", pin, value);
     if (value)
         fprintf(valueFile, "1");
     else
@@ -89,6 +86,8 @@ int releasePin(uint8_t pin)
 
 int setPin(uint8_t pin, uint8_t value)
 {
+    // If you need to set pin value once use this function,
+    // but if you need continuously pin writing manualy setup pin (exportPin, setDirPin) then call write and at the end releasePins
     return exportPin(pin) + setDirPin(pin, "out") + writePin(pin, value) + releasePin(pin);
 }
 
